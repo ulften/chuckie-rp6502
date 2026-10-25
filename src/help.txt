@@ -1,0 +1,6 @@
+Chuckie Egg for the Picocomputer 6502
+A port of the BBC Micro game by A&F Software (Nigel Alderton, 1983).
+
+Keys: A up, Z down, comma left, period right, Space jump.
+H holds the game, Escape and H together end it.
+S starts a game, K changes the keys.

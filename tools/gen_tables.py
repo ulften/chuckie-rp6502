@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Writes src/tables.inc: the font, the sound pitch table and the BBC Micro
+keyboard tables that the platform layer uses.
+
+Usage: gen_tables.py font8x8_basic.h tables.inc
+"""
+import re
+import sys
+
+# BBC Micro internal key number -> (USB HID keycode, extra HID keycode or 0,
+# the character of the MOS key translation table that OSBYTE &AC returns).
+# The PC key is the one in the same place, or the one with the same legend.
+HID = {
+    "A": 0x04, "B": 0x05, "C": 0x06, "D": 0x07, "E": 0x08, "F": 0x09,
+    "G": 0x0A, "H": 0x0B, "I": 0x0C, "J": 0x0D, "K": 0x0E, "L": 0x0F,
+    "M": 0x10, "N": 0x11, "O": 0x12, "P": 0x13, "Q": 0x14, "R": 0x15,
+    "S": 0x16, "T": 0x17, "U": 0x18, "V": 0x19, "W": 0x1A, "X": 0x1B,
+    "Y": 0x1C, "Z": 0x1D,
+    "1": 0x1E, "2": 0x1F, "3": 0x20, "4": 0x21, "5": 0x22, "6": 0x23,
+    "7": 0x24, "8": 0x25, "9": 0x26, "0": 0x27,
+    "RETURN": 0x28, "ESC": 0x29, "BKSP": 0x2A, "TAB": 0x2B, "SPACE": 0x2C,
+    "MINUS": 0x2D, "EQUAL": 0x2E, "LBRACKET": 0x2F, "RBRACKET": 0x30,
+    "BACKSLASH": 0x31, "HASH": 0x32, "SEMICOLON": 0x33, "QUOTE": 0x34,
+    "GRAVE": 0x35, "COMMA": 0x36, "PERIOD": 0x37, "SLASH": 0x38,
+    "CAPS": 0x39, "F1": 0x3A, "F2": 0x3B, "F3": 0x3C, "F4": 0x3D,
+    "F5": 0x3E, "F6": 0x3F, "F7": 0x40, "F8": 0x41, "F9": 0x42,
+    "F10": 0x43, "END": 0x4D, "RIGHT": 0x4F, "LEFT": 0x50, "DOWN": 0x51,
+    "UP": 0x52, "KPDIV": 0x54, "KPMUL": 0x55, "KPMINUS": 0x56,
+    "KPPLUS": 0x57, "KPENTER": 0x58, "KP1": 0x59, "KP2": 0x5A, "KP3": 0x5B,
+    "KP4": 0x5C, "KP5": 0x5D, "KP6": 0x5E, "KP7": 0x5F, "KP8": 0x60,
+    "KP9": 0x61, "KP0": 0x62, "KPDOT": 0x63, "LCTRL": 0xE0,
+    "LSHIFT": 0xE1, "RCTRL": 0xE4, "RSHIFT": 0xE5,
+}
+
+# internal number: (PC key, second PC key, MOS character)
+KEYS = {
+    0x00: ("LSHIFT", "RSHIFT", 0), 0x01: ("LCTRL", "RCTRL", 0),
+    0x10: ("Q", None, "Q"), 0x11: ("3", None, "3"), 0x12: ("4", None, "4"),
+    0x13: ("5", None, "5"), 0x14: ("F4", None, 0x84), 0x15: ("8", None, "8"),
+    0x16: ("F7", None, 0x87), 0x17: ("MINUS", None, "-"),
+    0x18: ("EQUAL", None, "^"), 0x19: ("LEFT", None, 0x8C),
+    0x1A: ("KP6", None, "6"), 0x1B: ("KP7", None, "7"),
+    0x20: ("F10", None, 0x80), 0x21: ("W", None, "W"), 0x22: ("E", None, "E"),
+    0x23: ("T", None, "T"), 0x24: ("7", None, "7"), 0x25: ("I", None, "I"),
+    0x26: ("9", None, "9"), 0x27: ("0", None, "0"),
+    0x28: ("BACKSLASH", None, "_"), 0x29: ("DOWN", None, 0x8E),
+    0x2A: ("KP8", None, "8"), 0x2B: ("KP9", None, "9"),
+    0x30: ("1", None, "1"), 0x31: ("2", None, "2"), 0x32: ("D", None, "D"),
+    0x33: ("R", None, "R"), 0x34: ("6", None, "6"), 0x35: ("U", None, "U"),
+    0x36: ("O", None, "O"), 0x37: ("P", None, "P"),
+    0x38: ("RBRACKET", None, "["), 0x39: ("UP", None, 0x8F),
+    0x3A: ("KPPLUS", None, "+"), 0x3B: ("KPMINUS", None, "-"),
+    0x3C: ("KPENTER", None, 0x0D),
+    0x40: ("CAPS", None, 0x01), 0x41: ("A", None, "A"), 0x42: ("X", None, "X"),
+    0x43: ("F", None, "F"), 0x44: ("Y", None, "Y"), 0x45: ("J", None, "J"),
+    0x46: ("K", None, "K"), 0x47: ("LBRACKET", None, "@"),
+    0x48: ("QUOTE", None, ":"), 0x49: ("RETURN", None, 0x0D),
+    0x4A: ("KPDIV", None, "/"), 0x4B: (None, None, 0x7F),
+    0x4C: ("KPDOT", None, "."),
+    0x50: (None, None, 0x02), 0x51: ("S", None, "S"), 0x52: ("C", None, "C"),
+    0x53: ("G", None, "G"), 0x54: ("H", None, "H"), 0x55: ("N", None, "N"),
+    0x56: ("L", None, "L"), 0x57: ("SEMICOLON", None, ";"),
+    0x58: ("HASH", None, "]"), 0x59: ("BKSP", None, 0x7F),
+    0x5A: (None, None, "#"), 0x5B: ("KPMUL", None, "*"), 0x5C: (None, None, ","),
+    0x60: ("TAB", None, 0x00), 0x61: ("Z", None, "Z"),
+    0x62: ("SPACE", None, " "), 0x63: ("V", None, "V"), 0x64: ("B", None, "B"),
+    0x65: ("M", None, "M"), 0x66: ("COMMA", None, ","),
+    0x67: ("PERIOD", None, "."), 0x68: ("SLASH", None, "/"),
+    0x69: ("END", None, 0x8B), 0x6A: ("KP0", None, "0"),
+    0x6B: ("KP1", None, "1"), 0x6C: ("KP3", None, "3"),
+    0x70: ("ESC", None, 0x1B), 0x71: ("F1", None, 0x81), 0x72: ("F2", None, 0x82),
+    0x73: ("F3", None, 0x83), 0x74: ("F5", None, 0x85), 0x75: ("F6", None, 0x86),
+    0x76: ("F8", None, 0x88), 0x77: ("F9", None, 0x89),
+    0x78: ("GRAVE", None, "\\"), 0x79: ("RIGHT", None, 0x8D),
+    0x7A: ("KP4", None, "4"), 0x7B: ("KP5", None, "5"), 0x7C: ("KP2", None, "2"),
+}
+
+
+def rows(name, data, per=16):
+    out = ["%s:" % name]
+    for i in range(0, len(data), per):
+        out.append("    .byte " + ", ".join("$%02X" % b for b in data[i:i + per]))
+    return out
+
+
+def main():
+    font_h, dst = sys.argv[1], sys.argv[2]
+    src = open(font_h).read()
+    glyphs = re.findall(r"\{\s*((?:0x[0-9A-Fa-f]{2},?\s*){8})\}", src)
+    assert len(glyphs) == 128, len(glyphs)
+    font = []
+    for ch in range(32, 128):
+        for v in re.findall(r"0x([0-9A-Fa-f]{2})", glyphs[ch]):
+            b = int(v, 16)
+            font.append(int("{:08b}".format(b)[::-1], 2))  # LSB-left to MSB-left
+    # The font has no glyph for DEL; BBC prints nothing for it in VDU 5.
+    out = ["; Generated by tools/gen_tables.py. Do not edit.", ""]
+    out += ["; 8x8 font for characters 32-127, top row first, leftmost pixel in",
+            "; bit 7. font8x8 by Daniel Hepper, public domain."]
+    out += rows("font_data", font)
+    # BBC pitch p: 53 is middle C, a step is a quarter of a semitone,
+    # so A440 is 89. The PSG takes the frequency times 3.
+    lo, hi = [], []
+    for p in range(256):
+        f = 440.0 * 2 ** ((p - 89) / 48.0)
+        v = min(65535, int(round(f * 3)))
+        lo.append(v & 255)
+        hi.append(v >> 8)
+    out += ["", "; PSG frequency (Hz * 3) of each BBC SOUND pitch, low and high bytes."]
+    out += rows("pitch_lo", lo) + rows("pitch_hi", hi)
+    h1, h2, mos = [0] * 128, [0] * 128, [0] * 128
+    for k, (a, b, c) in KEYS.items():
+        h1[k] = HID[a] if a else 0
+        h2[k] = HID[b] if b else 0
+        mos[k] = ord(c) if isinstance(c, str) else c
+    out += ["", "; BBC internal key number -> USB HID keycode (0 = none), and a second",
+            "; keycode for the same BBC key."]
+    out += rows("key_hid1", h1) + rows("key_hid2", h2)
+    out += ["", "; The key translation table that OSBYTE &AC returns, indexed by",
+            "; internal key number, with the codes of the BBC MOS."]
+    out += rows("key_ascii", mos)
+    open(dst, "w").write("\n".join(out) + "\n")
+
+
+if __name__ == "__main__":
+    main()
