@@ -78,7 +78,9 @@ skala, där 53 är mitt-C och varje steg en kvarts halvton.
 
 **Tid.** Spelet väntar 3 centisekunder per varv med intervalltimern
 (OSWORD 3/4), som här kommer från RIA:ns klocka. De två fördröjningsloopar
-som var räknade i cykler vid 2 MHz är ersatta med tidsstyrda väntor.
+som var räknade i cykler vid 2 MHz är ersatta med tidsstyrda väntor, och
+likaså väntan på 1–4 för antal spelare (14 sekunder, som på BBC:n). I
+titelvisningen läses S och K hela tiden, inte bara var 16:e centisekund.
 6502:an kör i standardtakten (8 MHz), så spelet går aldrig långsammare än
 originalets 3 centisekunder per varv.
 

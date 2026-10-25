@@ -6,7 +6,7 @@
 
 .segment "GAME"
 .export entry_point
-.import plat_sleep, plat_sleep_once, plat_layout_game, plat_layout_menu
+.import plat_sleep, plat_countdown, plat_counting, plat_layout_game, plat_layout_menu
 
 scan_f0 = $20  ; main.basm:14
 scan_f1 = $71  ; main.basm:15
@@ -4837,10 +4837,11 @@ select_player_count:  ; chuckie.basm:3346
     ldx #<((msg_how_many_players))  ; chuckie.basm:3347
     ldy #>((msg_how_many_players))  ; chuckie.basm:3347
     jsr write_counted_string  ; chuckie.basm:3348
-    lda #$00  ; chuckie.basm:3349
-    sta $8B  ; chuckie.basm:3350
-    lda #$64  ; chuckie.basm:3351
-    sta $8C  ; chuckie.basm:3352
+    ; RP6502: the original gave up after 25600 rounds of four INKEYs, about
+    ; 14 s at 2 MHz but only 2 s at 8 MHz. It is timed now.
+    lda #<1400
+    ldx #>1400
+    jsr plat_countdown
 wait_for_player_count_loop:  ; chuckie.basm:3353
     ldx #scan_1 ^ $FF  ; chuckie.basm:3354
     ldy #$FF  ; chuckie.basm:3355
@@ -4878,10 +4879,8 @@ three_not_pressed:  ; chuckie.basm:3380
     lda #$04  ; chuckie.basm:3387
     jmp init_player_count  ; chuckie.basm:3388
 four_not_pressed:  ; chuckie.basm:3389
-    dec $8B  ; chuckie.basm:3390
-    bne wait_for_player_count_loop  ; chuckie.basm:3391
-    dec $8C  ; chuckie.basm:3392
-    bne wait_for_player_count_loop  ; chuckie.basm:3393
+    jsr plat_counting
+    bcs wait_for_player_count_loop
     pla   ; chuckie.basm:3394
     pla   ; chuckie.basm:3395
     jmp outer_loop  ; chuckie.basm:3396
@@ -5094,9 +5093,17 @@ k_pressed:  ; chuckie.basm:3608
     jsr select_keys  ; chuckie.basm:3611
     jmp carousel_loop  ; chuckie.basm:3612
 carousel_test_keys_sleep:  ; chuckie.basm:3613
-    jsr carousel_test_keys  ; chuckie.basm:3614
-    ; RP6502: a delay loop of about 0.16 s at 2 MHz, now timed.
-    jmp plat_sleep_once
+    ; RP6502: a delay loop of about 0.16 s at 2 MHz, now timed. S and K
+    ; are tested all the time, so that a short press is not missed.
+    lda #16
+    ldx #0
+    jsr plat_countdown
+:   jsr carousel_test_keys
+    jsr plat_counting
+    bcs :-
+    ldx #0
+    ldy #0
+    rts
 draw_chuckie_banner_letter:  ; chuckie.basm:3623
     pha   ; chuckie.basm:3624
     jsr calculate_screen_location  ; chuckie.basm:3625

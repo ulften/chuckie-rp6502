@@ -30,12 +30,30 @@ PATCHES = [
     (3527, 3527, """\
     jsr plat_layout_menu    ; RP6502: show the rows of the title screens
     lda #$02"""),
+    (3349, 3352, """\
+    ; RP6502: the original gave up after 25600 rounds of four INKEYs, about
+    ; 14 s at 2 MHz but only 2 s at 8 MHz. It is timed now.
+    lda #<1400
+    ldx #>1400
+    jsr plat_countdown"""),
+    (3390, 3393, """\
+    jsr plat_counting
+    bcs wait_for_player_count_loop"""),
     (3456, 3467, """\
     ; RP6502: a delay loop of about 0.16 s per count at 2 MHz, now timed.
     jmp plat_sleep"""),
-    (3615, 3622, """\
-    ; RP6502: a delay loop of about 0.16 s at 2 MHz, now timed.
-    jmp plat_sleep_once"""),
+    (3614, 3622, """\
+    ; RP6502: a delay loop of about 0.16 s at 2 MHz, now timed. S and K
+    ; are tested all the time, so that a short press is not missed.
+    lda #16
+    ldx #0
+    jsr plat_countdown
+:   jsr carousel_test_keys
+    jsr plat_counting
+    bcs :-
+    ldx #0
+    ldy #0
+    rts"""),
 ]
 
 HEADER = """\
@@ -47,7 +65,7 @@ HEADER = """\
 
 .segment "GAME"
 .export entry_point
-.import plat_sleep, plat_sleep_once, plat_layout_game, plat_layout_menu
+.import plat_sleep, plat_countdown, plat_counting, plat_layout_game, plat_layout_menu
 """
 
 

@@ -20,7 +20,8 @@
 
 .export oswrch, osword, osbyte
 .export draw_sprite, calculate_screen_location
-.export plat_sleep, plat_sleep_once, plat_layout_game, plat_layout_menu
+.export plat_sleep, plat_countdown, plat_counting
+.export plat_layout_game, plat_layout_menu
 .import entry_point
 
 ; Zero page locations of the game that the sprite routines use.
@@ -78,6 +79,7 @@ itimer_base: .res 4     ; the clock when the interval timer was 0
 itmp_clock: .res 4
 cs_ticks:   .res 2      ; free running centiseconds
 cs_acc:     .res 1      ; VSYNC to centisecond fraction
+countdown:  .res 2      ; the end of plat_countdown, in cs_ticks
 bell_block: .res 8
 ; sound: four BBC channels, 0 noise and 1-3 tone, each with a queue of
 ; four notes.
@@ -410,11 +412,27 @@ plat_sleep:
     ldy #0
     rts
 
-plat_sleep_once:
-    lda #16
-    jsr wait_cs
-    ldx #0
-    ldy #0
+; Starts a countdown of X * 256 + A centiseconds.
+plat_countdown:
+    clc
+    sei
+    adc cs_ticks
+    sta countdown
+    txa
+    adc cs_ticks+1
+    cli
+    sta countdown+1
+    rts
+
+; C = 1 while the countdown runs. Keeps X and Y.
+plat_counting:
+    sei
+    lda cs_ticks
+    cmp countdown
+    lda cs_ticks+1
+    cli
+    sbc countdown+1
+    asl a               ; C = the sign: 1 before the end
     rts
 
 ; Waits A centiseconds.
