@@ -1284,6 +1284,17 @@ read_line:
     beq @delete
     cmp #8
     beq @delete
+    tax                 ; Caps Lock is on, as when the BBC starts: letters
+    and #$DF            ; are capitals, and Shift gives small letters
+    cmp #'A'
+    bcc @not_letter
+    cmp #'Z' + 1
+    bcs @not_letter
+    txa
+    eor #$20
+    tax
+@not_letter:
+    txa
     cmp rl_min_ch
     bcc @next
     cmp rl_max_ch

@@ -69,7 +69,8 @@ grafikfönster, CLG, MOVE och radredigering.
 **Tangentbordet.** INKEY och tangentskanningarna i OSBYTE läser RIA:ns
 tangentbitar i XRAM genom en tabell från BBC:ns interna tangentnummer till
 USB HID-koder. Namninmatning till topplistan (OSWORD 0) läser tecknen från
-konsolen.
+konsolen, med Caps Lock på som när BBC:n startar: bokstäverna blir
+versaler och Shift ger gemener.
 
 **Ljud.** SOUND och ENVELOPE körs på RIA:ns PSG, med fyra köer som i MOS.
 Avbrottet från VSYNC kör ljudet 100 gånger per sekund i snitt och sköter
